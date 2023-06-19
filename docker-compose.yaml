@@ -5,6 +5,7 @@ services:
       - '80:80'
     volumes:
       - ./services/gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
     depends_on:
       - load_balancer
       - frontend
@@ -14,6 +15,7 @@ services:
     image: nginx:1.25-alpine
     volumes:
       - ./services/load-balancer/nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
     depends_on:
       - api1
       - api2
@@ -23,6 +25,8 @@ services:
       context: ./services/api
     env_file:
       - ./services/api/.env
+    command: sh -c '/bin/wait-for-it.sh message_broker:5672 --timeout=30 -- npm start'
+    restart: unless-stopped
     depends_on:
       - mongo_db
       - message_broker
@@ -32,6 +36,8 @@ services:
       context: ./services/api
     env_file:
       - ./services/api/.env
+    command: sh -c '/bin/wait-for-it.sh message_broker:5672 --timeout=30 -- npm start'
+    restart: unless-stopped
     depends_on:
       - mongo_db
       - message_broker
@@ -39,11 +45,13 @@ services:
   frontend:
     build:
       context: ./services/frontend
+    restart: unless-stopped
 
   static_server:
     image: nginx:1.25-alpine
     volumes:
       - ./data/screenshots:/usr/share/nginx/html:ro
+    restart: unless-stopped
 
   # database:
   #   image: postgres:15.3-alpine
@@ -60,13 +68,18 @@ services:
       - '27017:27017'
     volumes:
       - ./data/db/mongo:/data/db
+    restart: unless-stopped
 
   message_broker:
-    image: rabbitmq:3.12-alpine
+    image: rabbitmq:3.12-management-alpine
+    ports:
+      - '15672:15672'
+      - '5672:5672'
     env_file:
       - ./services/message-broker/.env
     volumes:
       - ./data/broker:/var/lib/rabbitmq/
+    restart: unless-stopped
 
   scrap_worker1:
     build:
@@ -75,6 +88,8 @@ services:
       - ./services/scrap-worker/.env
     volumes:
       - ./data/screenshots:/app/screenshots
+    command: sh -c '/bin/wait-for-it.sh message_broker:5672 --timeout=30 -- npm start'
+    restart: unless-stopped
     depends_on:
       - mongo_db
       - message_broker
@@ -86,6 +101,8 @@ services:
       - ./services/scrap-worker/.env
     volumes:
       - ./data/screenshots:/app/screenshots
+    command: sh -c '/bin/wait-for-it.sh message_broker:5672 --timeout=30 -- npm start'
+    restart: unless-stopped
     depends_on:
       - mongo_db
       - message_broker

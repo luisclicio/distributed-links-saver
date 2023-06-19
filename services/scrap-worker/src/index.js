@@ -1,11 +1,19 @@
 import { MongoClient } from 'mongodb';
+import amqp from 'amqplib';
 
 import { Scraper } from './scraper.js';
 
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017';
+const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost:5672';
+const QUEUE_NAME = 'links';
 
 const mongoClient = new MongoClient(MONGO_URL);
+const amqpConnection = await amqp.connect(RABBITMQ_URL);
+const amqpChannel = await amqpConnection.createChannel();
 const scraper = new Scraper();
+
+await amqpChannel.assertQueue(QUEUE_NAME, { durable: true });
+amqpChannel.prefetch(1); // Process one message at a time
 
 async function getCollection(name) {
   await mongoClient.connect();
@@ -14,23 +22,34 @@ async function getCollection(name) {
   return collection;
 }
 
-(async () => {
-  try {
-    const collection = await getCollection('links');
-    const pageMetadata = await scraper.getPageMetadata({
-      url: 'https://www.scrapingbee.com/blog/playwright-web-scraping/',
-    });
+function parseMessage(message) {
+  return JSON.parse(message.content.toString());
+}
 
-    await collection.insertOne(pageMetadata);
-  } catch (error) {
-    console.error(error);
-  } finally {
-    await mongoClient.close();
+amqpChannel.consume(
+  QUEUE_NAME,
+  async (message) => {
+    try {
+      const link = parseMessage(message);
+      const collection = await getCollection('links');
+      const pageMetadata = await scraper.getPageMetadata({ url: link });
+
+      await collection.insertOne(pageMetadata);
+      amqpChannel.ack(message);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      await mongoClient.close();
+    }
+  },
+  {
+    noAck: false, // Manual acknowledgment
   }
-})();
+);
 
 process.on('uncaughtException', async (error) => {
   console.error(error);
   await mongoClient.close();
+  await amqpConnection.close();
   process.exit(1);
 });

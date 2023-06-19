@@ -54,7 +54,8 @@ export class Scraper {
       console.error(error);
       return null;
     } finally {
-      await browser.close();
+      await this._browser.close();
+      this._browser = null;
     }
   }
 
@@ -67,7 +68,7 @@ export class Scraper {
 
       return description;
     } catch (error) {
-      console.error(error);
+      console.warn(error);
       return '';
     }
   }

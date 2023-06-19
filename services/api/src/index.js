@@ -1,14 +1,19 @@
 import express from 'express';
 import { MongoClient } from 'mongodb';
+import amqp from 'amqplib';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const PORT = 3000;
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017';
+const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost:5672';
+const QUEUE_NAME = 'links';
 
 const app = express();
 const mongoClient = new MongoClient(MONGO_URL);
+const amqpConnection = await amqp.connect(RABBITMQ_URL);
+const amqpChannel = await amqpConnection.createChannel();
 
 app.use(express.json());
 
@@ -19,12 +24,18 @@ async function getCollection(name) {
   return collection;
 }
 
+async function sendToQueue(queueName, data) {
+  await amqpChannel.assertQueue(queueName, { durable: true });
+  amqpChannel.sendToQueue(queueName, Buffer.from(JSON.stringify(data)), {
+    persistent: true,
+  });
+}
+
 app.post('/links', async (req, res) => {
-  const { url } = req.body;
+  const { links = [] } = req.body;
 
   try {
-    // insert link to rabbitmq
-
+    links?.forEach(async (link) => await sendToQueue(QUEUE_NAME, link));
     return res.status(201).send({ success: true });
   } catch (error) {
     console.error(error);
@@ -59,5 +70,6 @@ app.listen(PORT, () => {
 process.on('uncaughtException', async (error) => {
   console.error(error);
   await mongoClient.close();
+  await amqpConnection.close();
   process.exit(1);
 });
