@@ -1,76 +1,36 @@
-const { chromium } = require('playwright');
-const path = require('path');
+import { MongoClient } from 'mongodb';
+
+import { Scraper } from './scraper.js';
+
+const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017';
+
+const mongoClient = new MongoClient(MONGO_URL);
+const scraper = new Scraper();
+
+async function getCollection(name) {
+  await mongoClient.connect();
+  const database = mongoClient.db('links-saver');
+  const collection = database.collection(name);
+  return collection;
+}
 
 (async () => {
-  const pageMetadata = await getPageMetadata({
-    url: 'https://www.scrapingbee.com/blog/playwright-web-scraping/',
-    headless: true,
-  });
+  try {
+    const collection = await getCollection('links');
+    const pageMetadata = await scraper.getPageMetadata({
+      url: 'https://www.scrapingbee.com/blog/playwright-web-scraping/',
+    });
 
-  console.log(pageMetadata);
+    await collection.insertOne(pageMetadata);
+  } catch (error) {
+    console.error(error);
+  } finally {
+    await mongoClient.close();
+  }
 })();
 
-async function getBrowser({ headless = false }) {
-  try {
-    const browser = await chromium.launch({ headless, slowMo: 50 });
-    return browser;
-  } catch (error) {
-    console.error(error);
-    return null;
-  }
-}
-
-async function getPageMetadata({ url, headless = false }) {
-  const browser = await getBrowser({ headless });
-
-  if (!browser) {
-    return null;
-  }
-
-  try {
-    const page = await browser.newPage();
-    await page.goto(url);
-    const title = await page.title();
-    const description = await getDescription({ page });
-    const screenshotPath = await saveScreenshot({ page });
-
-    return {
-      url,
-      title,
-      description,
-      screenshotPath,
-      processDate: new Date(),
-    };
-  } catch (error) {
-    console.error(error);
-    return null;
-  } finally {
-    await browser.close();
-  }
-}
-
-async function getDescription({ page }) {
-  try {
-    const description = await page.$eval(
-      'meta[name="description"]',
-      (element) => element.getAttribute('content')
-    );
-
-    return description;
-  } catch (error) {
-    console.error(error);
-    return '';
-  }
-}
-
-async function saveScreenshot({ page, folder = 'screenshots' }) {
-  try {
-    const randomID = Math.random().toString(36).substring(7); // Trocar por UUID ao invés de random
-    const filePath = path.join(folder, `${randomID}.png`);
-    await page.screenshot({ path: filePath });
-    return filePath;
-  } catch (error) {
-    console.error(error);
-    return null;
-  }
-}
+process.on('uncaughtException', async (error) => {
+  console.error(error);
+  await mongoClient.close();
+  process.exit(1);
+});
