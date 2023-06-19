@@ -15,7 +15,7 @@ Este projeto é uma aplicação distribuída que realiza _web scraping_ de links
 7. REST API (Node.js)
 8. Message Broker (RabbitMQ)
 9. Web Scraper Worker (Node.js)
-10. Database (PostgreSQL)
+10. Database (MongoDB)
 11. Internet
 
 ## Como executar o projeto

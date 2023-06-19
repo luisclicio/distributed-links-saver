@@ -21,15 +21,19 @@ services:
   api1:
     build:
       context: ./services/api
+    env_file:
+      - ./services/api/.env
     depends_on:
-      - database
+      - mongo_db
       - message_broker
 
   api2:
     build:
       context: ./services/api
+    env_file:
+      - ./services/api/.env
     depends_on:
-      - database
+      - mongo_db
       - message_broker
 
   frontend:
@@ -41,14 +45,21 @@ services:
     volumes:
       - ./data/screenshots:/usr/share/nginx/html:ro
 
-  database:
-    image: postgres:15.3-alpine
-    env_file:
-      - ./services/db/.env
+  # database:
+  #   image: postgres:15.3-alpine
+  #   env_file:
+  #     - ./services/db/.env
+  #   ports:
+  #     - '5432:5432'
+  #   volumes:
+  #     - ./data/db/pg:/var/lib/postgresql/data
+
+  mongo_db:
+    image: mongo:6.0.6
     ports:
-      - '5432:5432'
+      - '27017:27017'
     volumes:
-      - ./data/db/pg:/var/lib/postgresql/data
+      - ./data/db/mongo:/data/db
 
   message_broker:
     image: rabbitmq:3.12-alpine
@@ -60,43 +71,21 @@ services:
   scrap_worker1:
     build:
       context: ./services/scrap-worker
+    env_file:
+      - ./services/scrap-worker/.env
     volumes:
       - ./data/screenshots:/app/screenshots
     depends_on:
-      - database
+      - mongo_db
       - message_broker
-    # env_file:
-    #   - ./scrap-worker/.env
 
   scrap_worker2:
     build:
       context: ./services/scrap-worker
+    env_file:
+      - ./services/scrap-worker/.env
     volumes:
       - ./data/screenshots:/app/screenshots
     depends_on:
-      - database
+      - mongo_db
       - message_broker
-    # env_file:
-    #   - ./scrap-worker/.env
-#
-# volumes:
-#   database_data:
-#     driver: local
-#     driver_opts:
-#       type: none
-#       device: ./data/db
-#       o: bind
-
-#   broker_data:
-#     driver: local
-#     driver_opts:
-#       type: none
-#       device: ./data/broker
-#       o: bind
-
-#   screenshots_data:
-#     driver: local
-#     driver_opts:
-#       type: none
-#       device: ./data/screenshots
-#       o: bind
