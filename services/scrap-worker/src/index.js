@@ -47,9 +47,24 @@ amqpChannel.consume(
   }
 );
 
-process.on('uncaughtException', async (error) => {
-  console.error(error);
+async function gracefulShutdown(exitCode = 0) {
   await mongoClient.close();
   await amqpConnection.close();
-  process.exit(1);
+  await scraper.closeBrowser();
+  process.exit(exitCode);
+}
+
+process.on('SIGINT', () => {
+  console.info('SIGINT signal received.');
+  gracefulShutdown();
+});
+
+process.on('SIGTERM', () => {
+  console.info('SIGTERM signal received.');
+  gracefulShutdown();
+});
+
+process.on('uncaughtException', (error) => {
+  console.error(error);
+  gracefulShutdown(1);
 });

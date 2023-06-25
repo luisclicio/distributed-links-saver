@@ -6,6 +6,7 @@ export class Scraper {
   constructor({ headless = true, devtools = false } = {}) {
     this._headless = headless;
     this._devtools = devtools;
+    this._browser = null;
   }
 
   async loadBrowser() {
@@ -14,6 +15,15 @@ export class Scraper {
     }
 
     this._browser = await this.getBrowser();
+  }
+
+  async closeBrowser() {
+    if (!this._browser) {
+      return;
+    }
+
+    await this._browser.close();
+    this._browser = null;
   }
 
   async getBrowser() {
@@ -38,10 +48,15 @@ export class Scraper {
 
     try {
       const page = await this._browser.newPage();
-      await page.goto(url);
+      await page.goto(url, {
+        waitUntil: 'load',
+        timeout: 30000,
+      });
+
       const title = await page.title();
       const description = await this.getDescription({ page });
       const screenshotFileName = await this.saveScreenshot({ page });
+      await page.close();
 
       return {
         url,
@@ -53,9 +68,6 @@ export class Scraper {
     } catch (error) {
       console.error(error);
       return null;
-    } finally {
-      await this._browser.close();
-      this._browser = null;
     }
   }
 
