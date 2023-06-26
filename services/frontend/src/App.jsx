@@ -25,6 +25,7 @@ import {
   IconSend,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
+import { useInterval } from '@mantine/hooks';
 
 export function App() {
   const theme = useMantineTheme();
@@ -77,15 +78,20 @@ export function App() {
       const data = await response.json();
 
       if (response.ok && data?.success) {
-        setLinks(data.links);
+        setLinks(data.links.reverse());
       }
     } catch (error) {
       console.error(error);
     }
   }
 
+  const updateInterval = useInterval(fetchLinks, 20000); // 20 seconds
+
   useEffect(() => {
     fetchLinks();
+    updateInterval.start();
+
+    return updateInterval.stop;
   }, []);
 
   return (
@@ -204,7 +210,7 @@ function LinkCard({ url, title, description, imageId }) {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          variant="light"
+          variant="subtle"
           fullWidth
           leftIcon={<IconExternalLink />}
         >
@@ -214,7 +220,7 @@ function LinkCard({ url, title, description, imageId }) {
         <CopyButton value={url}>
           {({ copied, copy }) => (
             <Button
-              variant={copied ? 'filled' : 'light'}
+              variant={copied ? 'filled' : 'subtle'}
               fullWidth
               leftIcon={<IconCopy />}
               onClick={copy}
