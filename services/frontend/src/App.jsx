@@ -15,7 +15,7 @@ import {
   Title,
   useMantineTheme,
 } from '@mantine/core';
-import { hasLength, useForm } from '@mantine/form';
+import { useForm } from '@mantine/form';
 import { Notifications, notifications } from '@mantine/notifications';
 import {
   IconCopy,
@@ -35,7 +35,29 @@ export function App() {
     },
 
     validate: {
-      links: hasLength({ min: 1, trim: true }),
+      // Valida se todos os valores passados no campo são links válidos
+      links: (value) => {
+        const linksParsed = value.split(';').map((link) => link.trim());
+
+        if (linksParsed.length === 0) {
+          return 'Preencha com pelo menos um link';
+        }
+
+        const invalidLinks = linksParsed.filter((link) => {
+          try {
+            new URL(link);
+            return false;
+          } catch {
+            return true;
+          }
+        });
+
+        if (invalidLinks.length > 0) {
+          return `Os seguintes links são inválidos: ${invalidLinks.join(', ')}`;
+        }
+
+        return null;
+      },
     },
   });
   const [links, setLinks] = useState([]);
